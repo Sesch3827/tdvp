@@ -44,7 +44,7 @@ header button{padding:8px 12px}.panel .hint{display:none}
 <section class="panel wide"><h2>04 // Vindhastighet over tid</h2><canvas class="chart" id="chart"></canvas><div class="subread">Siste 120 målinger · lokal tid</div></section>
 <section class="panel camera-panel"><h2>05 // AXIS 215 PTZ · LIVE</h2><button class="camera-preview" id="openCamera" title="Vis større kamerabilde"><img id="cameraPreview" alt="Kamerabilde fra Axis 215 PTZ"><span>TRYKK FOR STØRRE BILDE</span></button><div class="camera-actions"><span id="cameraStatus">Kobler til kamera …</span><a href="http://10.0.1.39/" target="_blank" rel="noopener noreferrer">ÅPNE KAMERA ↗</a></div><div class="tag" id="last">Venter på målinger …</div></section></div>
 <div class="footer"><span>TD-VP • DATA LAGRES I DENNE NETTLESEREN • SD-KORT KOMMER SENERE</span><span id="clock"></span></div></main>
-<div class="modal" id="cameraModal" role="dialog" aria-modal="true" aria-label="Kameravisning"><div class="modal-inner"><div class="modal-head"><h2>AXIS 215 PTZ // KAMERAVISNING</h2><button id="closeCamera">LUKK ✕</button></div><img class="camera-large" id="cameraLarge" alt="Stort kamerabilde"><p class="hint">Oppdateres automatisk. For PTZ-styring åpner du kameraets egen side.</p><a href="http://10.0.1.39/" target="_blank" rel="noopener noreferrer">ÅPNE PTZ-STYRING ↗</a></div></div>
+<div class="modal" id="cameraModal" role="dialog" aria-modal="true" aria-label="Kameravisning"><div class="modal-inner"><div class="modal-head"><h2>AXIS 215 PTZ // KAMERAVISNING</h2><button id="closeCamera">LUKK ✕</button></div><img class="camera-large" id="cameraLarge" alt="Stort kamerabilde"><p class="hint">Kontinuerlig MJPEG-strøm. For PTZ-styring åpner du kameraets egen side.</p><a href="http://10.0.1.39/" target="_blank" rel="noopener noreferrer">ÅPNE PTZ-STYRING ↗</a></div></div>
 <div class="modal" id="logModal" role="dialog" aria-modal="true" aria-label="Logg og debugger"><div class="modal-inner"><div class="modal-head"><h2>LOGG / DEBUG</h2><button id="closeLog">LUKK ✕</button></div><p class="hint">Støttet format: <code>direction:NE,speed:4.2,pressure:1013,temperature:18.5,rain:2.4</code>. Én tekstlinje per pakke, baudrate 115200. Lufttrykk er midlertidig deaktivert.</p><div class="log" id="log">Ingen data mottatt.</div><div class="modal-actions"><button id="export">LAST NED CSV</button><button id="clear">TØM LAGREDE MÅLINGER</button></div></div></div>
 <script>
 "use strict";
@@ -120,26 +120,26 @@ $("recordToggle").onclick=()=>{if(mode!=="serial")return;recordingEnabled=!recor
 $("connect").onclick=async()=>{if(mode==="serial"){await disconnect();return}if(!("serial" in navigator)){alert("Web Serial støttes ikke her. Bruk Chrome på Chromebook over HTTPS.");return}stopDemo();let buffer="";try{port=await navigator.serial.requestPort();await port.open({baudRate:115200});recordingEnabled=true;setMode("serial");while(port?.readable){reader=port.readable.getReader();try{while(true){const{value,done}=await reader.read();if(done)break;buffer+=new TextDecoder().decode(value,{stream:true});const lines=buffer.split(/\r?\n/);buffer=lines.pop()||"";for(const line of lines.slice(-30))acceptSerialLine(line);if(buffer.length>2048){rejectSerial("For lang pakke",buffer);buffer=""}}}finally{reader.releaseLock();reader=null}}}catch(e){if(e.name!=="NotFoundError")alert("Seriell tilkobling: "+e.message)}finally{if(buffer.trim()&&mode==="serial")rejectSerial("Ufullstendig pakke uten linjeskift",buffer);const closingPort=port;port=null;reader=null;setMode("off");if(serialFlushTimer){clearInterval(serialFlushTimer);serialFlushTimer=null}pendingSerial=null;if(closingPort){try{await closingPort.close()}catch{}}}};
 $("export").onclick=()=>{const header=["time","speed_ms","direction_deg","pressure_hpa","temperature_c","rain_mm","gust_ms"],rows=[header.join(",")];for(const d of history)rows.push([new Date(d.time).toISOString(),d.speed??"",d.direction??"",d.pressure??"",d.temp??"",d.rain??"",d.gust??""].join(","));const blob=new Blob(["\ufeff"+rows.join("\r\n")],{type:"text/csv;charset=utf-8"}),url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download="tdvp-"+new Date().toISOString().slice(0,10)+".csv";a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)};
 $("clear").onclick=()=>{if(!confirm("Slette lagrede målinger i denne nettleseren?"))return;history=[];points.length=0;count=0;localStorage.removeItem(STORE);$("count").textContent="0";drawChart()};
-const cameraUrl="http://10.0.1.39/axis-cgi/jpg/image.cgi";
-let cameraActive=true,cameraLoading=false;
-function refreshCamera(){
- if(!cameraActive||cameraLoading||document.hidden)return;
- cameraLoading=true;
+const cameraUrl="http://10.0.1.39/axis-cgi/mjpg/video.cgi?resolution=320x240";
+function startCamera(){
  const preview=$("cameraPreview");
- const probe=new Image();
- const timeout=setTimeout(()=>{cameraLoading=false;$("cameraStatus").textContent="Ingen bilde – prøv ÅPNE KAMERA";},4500);
- probe.onload=()=>{clearTimeout(timeout);cameraLoading=false;preview.src=probe.src;if($("cameraModal").classList.contains("open"))$("cameraLarge").src=probe.src;$("cameraStatus").textContent="Kamera · 10.0.1.39";};
- probe.onerror=()=>{clearTimeout(timeout);cameraLoading=false;$("cameraStatus").textContent="Nettleseren blokkerer muligens HTTP-bildet";};
- probe.src=cameraUrl+"?t="+Date.now();
+ preview.src=cameraUrl;
+ $("cameraStatus").textContent="MJPEG LIVE · 10.0.1.39";
 }
+$("cameraPreview").onerror=()=>{
+ $("cameraStatus").textContent="Ingen videostrøm – sjekk HTTP/HTTPS og kameratilgang";
+};
+$("cameraLarge").onerror=()=>{
+ $("cameraStatus").textContent="Kunne ikke åpne MJPEG-strømmen";
+};
 function showModal(id){$(id).classList.add("open")}
 function hideModal(id){$(id).classList.remove("open")}
-$("openCamera").onclick=()=>{showModal("cameraModal");$("cameraLarge").src=$("cameraPreview").src;refreshCamera()};
+$("openCamera").onclick=()=>{showModal("cameraModal");$("cameraLarge").src=cameraUrl};
 $("closeCamera").onclick=()=>hideModal("cameraModal");
 $("showLog").onclick=()=>showModal("logModal");
 $("closeLog").onclick=()=>hideModal("logModal");
 for(const id of ["cameraModal","logModal"])$(id).addEventListener("click",e=>{if(e.target===$(id))hideModal(id)});
 document.addEventListener("keydown",e=>{if(e.key==="Escape"){hideModal("cameraModal");hideModal("logModal")}});
-refreshCamera();setInterval(refreshCamera,1500);
+startCamera();
 setInterval(()=>$("clock").textContent=new Date().toLocaleString("no-NO"),1000);
 </script></body></html>
