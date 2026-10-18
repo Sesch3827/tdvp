@@ -35,12 +35,12 @@ header button{padding:8px 12px}.panel .hint{display:none}
 @media(min-width:571px) and (max-width:849px){.wrap{max-width:740px}.grid{grid-template-columns:repeat(2,minmax(0,1fr))}.wide{grid-column:span 2}.dial,.compass{max-height:260px}}
 @media(max-width:570px){.dial,.compass{max-height:290px}}
 </style></head><body><main class="wrap">
-<header><div><div class="eyebrow">TD-VP // TELEMETRY SYSTEM</div><h1>STORM <span>COMMAND</span></h1><div class="subtitle">MICRO:BIT WIRELESS WEATHER PROBE • V1.2.4</div></div><div class="controls"><span class="status"><span class="dot" id="dot"></span><span id="status">IKKE TILKOBLET</span></span><button id="connect">KOBLE TIL USB</button><button id="demo">START DEMO</button></div></header>
+<header><div><div class="eyebrow">TD-VP // TELEMETRY SYSTEM</div><h1>STORM <span>COMMAND</span></h1><div class="subtitle">MICRO:BIT WIRELESS WEATHER PROBE • V1.2.5</div></div><div class="controls"><span class="status"><span class="dot" id="dot"></span><span id="status">IKKE TILKOBLET</span></span><button id="connect">KOBLE TIL USB</button><button id="demo">START DEMO</button></div></header>
 <div class="grid"><section class="panel"><h2>01 // Vindhastighet</h2><svg class="dial" viewBox="0 0 300 300" aria-label="Vindhastighetsmåler"><circle class="ring" cx="150" cy="150" r="105" stroke-dasharray="495 660" transform="rotate(135 150 150)"/><circle class="arc" id="speedArc" cx="150" cy="150" r="105"/><g id="ticks"></g><text x="150" y="73" fill="#87b4c8" text-anchor="middle" font-size="11" letter-spacing="3">WIND SPEED</text></svg><div class="reading"><div class="big"><span id="speed">--.-</span> <span class="unit">m/s</span></div></div><div class="subread">Kast: <strong id="gust">--.-</strong> m/s · <span id="beaufort">Ingen data</span></div></section>
 <section class="panel"><h2>02 // Vindretning</h2><svg class="compass" viewBox="0 0 300 300" aria-label="Kompass"><circle cx="150" cy="150" r="114" fill="#081725" stroke="#285b70" stroke-width="2"/><circle cx="150" cy="150" r="92" fill="none" stroke="#1d3f54" stroke-dasharray="2 8"/><g fill="#a6d0df" font-size="15" font-weight="700" text-anchor="middle"><text x="150" y="26">N</text><text x="273" y="155">Ø</text><text x="150" y="288">S</text><text x="27" y="155">V</text></g><g id="compassTicks"></g><g class="needle" id="needle"><path d="M150 45 L138 157 L150 145 L162 157 Z" fill="#52e7ff"/><path d="M150 255 L138 157 L150 168 L162 157 Z" fill="#39647c"/></g><circle cx="150" cy="150" r="8" fill="#e2fcff"/></svg><div class="big"><span id="direction">---</span><span class="unit">°</span></div><div class="subread" id="cardinal">Retning ikke tilgjengelig</div></section>
 <section class="panel"><h2>03 // Atmosfæriske målinger</h2><div class="metrics"><div class="metric"><div class="label">LUFTTRYKK</div><div class="value"><span id="pressure">----</span> <small>hPa</small></div></div><div class="metric"><div class="label">TEMPERATUR</div><div class="value"><span id="temp">--.-</span> <small>°C</small></div></div><div class="metric"><div class="label">NEDBØR</div><div class="value"><span id="rain">--.-</span> <small>mm</small></div></div><div class="metric"><div class="label">MÅLINGER</div><div class="value" id="count">0</div></div></div><p class="hint">Verdier vises når de mottas fra micro:bit. Manglende sensorer vises som streker.</p></section>
 <section class="panel wide"><h2>04 // Vindhastighet over tid</h2><canvas class="chart" id="chart"></canvas><div class="subread">Siste 120 målinger · lokal tid</div></section>
-<section class="panel"><h2>05 // Datastrøm</h2><div class="tag" id="last">Venter på målinger …</div><p class="hint">Støttet format: <code>direction:NE,speed:4.2,pressure:1013,temperature:18.5,rain:2.4</code>. Send én samlet tekstlinje med komma mellom feltene og ett linjeskift til slutt. En måling registreres først når alle fem felt er mottatt og kontrollert. Trykk sendes ferdig omregnet i hPa og brukes direkte. Temperatur i °C og nedbør i mm. Baudrate: 115200.</p><div class="log" id="log">Ingen data mottatt.</div><div style="margin-top:12px"><button id="export">LAST NED CSV</button> <button id="clear">TØM LOGG</button></div></section></div>
+<section class="panel"><h2>05 // Datastrøm</h2><div class="tag" id="last">Venter på målinger …</div><p class="hint">Støttet format: <code>direction:NE,speed:4.2,pressure:1013,temperature:18.5,rain:2.4</code>. Send én samlet tekstlinje med komma mellom feltene og ett linjeskift til slutt. En måling registreres først når alle fem felt er mottatt og kontrollert. Lufttrykk er midlertidig deaktivert og påvirker ikke de andre målingene. Temperatur i °C og nedbør i mm. Baudrate: 115200.</p><div class="log" id="log">Ingen data mottatt.</div><div style="margin-top:12px"><button id="export">LAST NED CSV</button> <button id="clear">TØM LOGG</button></div></section></div>
 <div class="footer"><span>TD-VP • DATA LAGRES I DENNE NETTLESEREN • SD-KORT KOMMER SENERE</span><span id="clock"></span></div></main>
 <script>
 "use strict";
@@ -62,7 +62,7 @@ return{speed,direction,pressure,temp,rain,gust,time:Date.now()}}
 function render(d){if(d.speed!==null){$("speed").textContent=d.speed.toFixed(1);$("beaufort").textContent=beaufort(d.speed);$("speedArc").style.strokeDasharray=(Math.min(1,Math.max(0,d.speed/40))*495)+" 660"}
 if(d.gust!==null)$("gust").textContent=d.gust.toFixed(1);
 if(d.direction!==null){$("direction").textContent=Math.round(d.direction);$("cardinal").textContent=labelDir(d.direction);let delta=((d.direction-previousDirection+540)%360)-180;previousDirection+=delta;$("needle").style.transform="rotate("+previousDirection+"deg)"}
-if(d.pressure!==null)$("pressure").textContent=d.pressure.toFixed(1);
+if(mode==="serial")$("pressure").textContent="—";else if(d.pressure!==null)$("pressure").textContent=d.pressure.toFixed(1);
 if(d.temp!==null)$("temp").textContent=d.temp.toFixed(1);
 if(d.rain!==null)$("rain").textContent=d.rain.toFixed(1);
 $("last").textContent=(mode==="serial"?"USB / LIVE · ":mode==="demo"?"DEMO · ":"")+"Siste måling: "+new Date(d.time).toLocaleTimeString("no-NO");$("count").textContent=count;drawChart()}
@@ -89,14 +89,15 @@ function acceptSerialLine(line){
   if(key!=="direction"&&!numeric.test(value)){rejectSerial("Ugyldig tall i "+key,line);serialFields={};serialStarted=0;return}
   serialFields[key]=value;
  }
- const keys=["direction","speed","pressure","temperature","rain"];
+ const keys=["direction","speed","temperature","rain"];
  if(!keys.every(k=>serialFields[k]!==undefined))return;
- const packet=keys.map(k=>k+":"+serialFields[k]).join(",");
+ const packet=["direction","speed","pressure","temperature","rain"].filter(k=>serialFields[k]!==undefined).map(k=>k+":"+serialFields[k]).join(",");
  const data=parseLine(packet);
  serialFields={};serialStarted=0;
- if(!data||[data.speed,data.direction,data.pressure,data.temp,data.rain].some(v=>v===null)){rejectSerial("Ugyldig måling",packet);return}
- // Pressure sensor transmits a raw integer scaled by 25600.
- const limits={speed:[0,100],direction:[0,360],pressure:[800,1100],temp:[-50,60],rain:[0,1000]};
+ if(!data||[data.speed,data.direction,data.temp,data.rain].some(v=>v===null)){rejectSerial("Ugyldig måling",packet);return}
+ // Pressure is temporarily disabled; ignore its value without blocking other sensors.
+ data.pressure=null;
+ const limits={speed:[0,100],direction:[0,360],temp:[-50,60],rain:[0,1000]};
  for(const [key,[min,max]] of Object.entries(limits)){
   if(!Number.isFinite(data[key])||data[key]<min||data[key]>max){
    rejectSerial(key+" utenfor kontrollgrenser ("+data[key]+", forventet "+min+"–"+max+")"+(key==="pressure"?" | mottatt trykk="+data.pressure+" hPa":""),packet);
